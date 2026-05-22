@@ -182,9 +182,9 @@
 
   <!-- Botones táctiles -->
   <div id="ui-buttons" role="navigation" aria-label="Opciones del guía">
-    <button class="ar-btn" onclick="handleBtn(this, 'comer')"    aria-label="Dónde comer">🍽️ Dónde comer</button>
-    <button class="ar-btn" onclick="handleBtn(this, 'hospedaje')" aria-label="Hospedaje">🏨 Hospedaje</button>
-    <button class="ar-btn" onclick="handleBtn(this, 'idioma')"   aria-label="Idioma">🌐 Idioma</button>
+    <button id="btn-comer"     class="ar-btn" onclick="handleBtn(this,'comer')"     aria-label="Dónde comer">🍽️ Dónde comer</button>
+    <button id="btn-hospedaje" class="ar-btn" onclick="handleBtn(this,'hospedaje')" aria-label="Hospedaje">🏨 Hospedaje</button>
+    <button id="btn-idioma"    class="ar-btn" onclick="switchLang()"                aria-label="Idioma">🌐 Idioma</button>
   </div>
 
   <!-- Escena AR -->
@@ -204,10 +204,10 @@
         id="guide-entity"
         gltf-model="#guia-model"
         scale="1.5 1.5 1.5"
-        position="0 1.5 0"
+        position="0 -0.5 0.5"
         rotation="0 180 0"
         animation-mixer="loop: repeat; timeScale: 1; clampWhenFinished: false;"
-        animation__float="property: position; from: 0 1.5 0; to: 0 1.7 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
+        animation__float="property: position; from: 0 -0.5 0.5; to: 0 -0.3 0.5; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
         animation__appear="property: scale; from: 0 0 0; to: 1.5 1.5 1.5; dur: 600; easing: easeOutBack; startEvents: markerFound;"
       ></a-entity>
     </a-marker>
@@ -217,11 +217,34 @@
 
   <script>
     const messages = {
-      default:   '¡Hola! Bienvenido a la Terminal de Tucumán. Soy Gonza y seré tu guía. Los baños están a la derecha, entre las plataformas 5 y 10. ¿En qué puedo ayudarte?',
-      comer:     'Te recomiendo Restaurante El Portal (plataforma 2) y Bar La Terminal. Ambos abren 24hs.',
-      hospedaje: 'Hoteles cercanos: Hotel Premier (a 5 cuadras) y Hostel Centro (económico). ¿Querés más info?',
-      idioma:    'I speak English too! Ich spreche auch Deutsch. ¿Qué idioma preferís?'
+      es: {
+        default:   '¡Hola! Bienvenido a la Terminal de Tucumán. ¿En qué te puedo ayudar?',
+        comer:     '¿Tenés hambre? En el primer piso hay un patio de comidas, local 3 Don Panchos con un 15% de descuento en efectivo.',
+        hospedaje: 'Si necesitás descansar, hay hoteles a dos cuadras por la calle, como el Sheraton Tucumán.',
+      },
+      en: {
+        default:   'Hello! Welcome to Tucumán Terminal. How can I help you?',
+        comer:     'Are you hungry? On the first floor there is a food court, stall 3 Don Panchos with a 15% cash discount.',
+        hospedaje: 'If you need to rest, there are hotels two blocks away on the street, like the Sheraton Tucumán.',
+      }
     };
+
+    let currentLang = 'es';
+
+    function switchLang() {
+      currentLang = currentLang === 'es' ? 'en' : 'es';
+      const isEN = currentLang === 'en';
+      document.getElementById('btn-comer').textContent     = isEN ? '🍽️ Food'    : '🍽️ Dónde comer';
+      document.getElementById('btn-hospedaje').textContent = isEN ? '🏨 Hotels'  : '🏨 Hospedaje';
+      document.getElementById('btn-idioma').textContent    = isEN ? '🌐 Español' : '🌐 Idioma';
+      loadVoiceForLang(currentLang);
+      const msg = isEN
+        ? 'Language switched to English. How can I help you?'
+        : '¡Idioma cambiado a español! ¿En qué te puedo ayudar?';
+      bubbleText.textContent = msg;
+      showBubble();
+      speak(msg);
+    }
 
     const bubble     = document.getElementById('speech-bubble');
     const bubbleText = document.getElementById('bubble-text');
@@ -244,9 +267,9 @@
     marker.addEventListener('markerFound', () => {
       markerVisible = true;
       waitingMsg.style.display = 'none';
-      bubbleText.textContent = messages.default;
+      bubbleText.textContent = messages[currentLang].default;
       showBubble();
-      speak(messages.default);
+      speak(messages[currentLang].default);
     });
 
     // Marcador perdido
@@ -269,9 +292,9 @@
       activeBtn = btn;
       btn.classList.add('active');
       setTimeout(() => btn.classList.remove('active'), 300);
-      bubbleText.textContent = messages[type];
+      bubbleText.textContent = messages[currentLang][type];
       showBubble();
-      speak(messages[type]);
+      speak(messages[currentLang][type]);
     }
 
     // ── Web Speech API (TTS) ──────────────────────────────────────────────
@@ -289,15 +312,20 @@
       if (pendingSpeech) { speak(pendingSpeech); pendingSpeech = null; }
     }, { once: true });
 
-    function loadVoices() {
+    function loadVoiceForLang(lang) {
       const voices = window.speechSynthesis.getVoices();
-      selectedVoice = voices.find(v => v.lang === 'es-AR')
-                   || voices.find(v => v.lang === 'es-ES')
-                   || voices.find(v => v.lang.startsWith('es'));
+      const maleNames = /male|jorge|pablo|carlos|diego|miguel|hector|david|mark|james|daniel/i;
+      const prefix = lang === 'en' ? 'en' : 'es';
+      const preferred = lang === 'en' ? 'en-US' : 'es-AR';
+      selectedVoice = voices.find(v => v.lang === preferred && maleNames.test(v.name))
+                   || voices.find(v => v.lang === preferred)
+                   || voices.find(v => v.lang.startsWith(prefix) && maleNames.test(v.name))
+                   || voices.find(v => v.lang.startsWith(prefix))
+                   || null;
     }
     if ('speechSynthesis' in window) {
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
+      loadVoiceForLang('es');
+      window.speechSynthesis.onvoiceschanged = () => loadVoiceForLang(currentLang);
     }
 
     function speak(text) {
@@ -305,8 +333,8 @@
       if (!speechUnlocked) { pendingSpeech = text; return; }
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.lang   = 'es-AR';
-      utt.rate   = 0.88;
+      utt.lang   = currentLang === 'en' ? 'en-US' : 'es-AR';
+      utt.rate   = 0.9;
       utt.pitch  = 1.0;
       utt.volume = 1.0;
       if (selectedVoice) utt.voice = selectedVoice;
