@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Guía AR — Terminal de Tucumán</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #000;
+      touch-action: none;
+    }
+
+    /* ── Speech Bubble ── */
+    #speech-bubble {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 14px 20px;
+      max-width: 88vw;
+      width: max-content;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      font-size: 14.5px;
+      line-height: 1.5;
+      color: #1a1a2e;
+      font-weight: 500;
+      z-index: 200;
+      display: none;
+      animation: bubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    #speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 12px 10px 0;
+      border-style: solid;
+      border-color: #ffffff transparent transparent;
+      filter: drop-shadow(0 3px 4px rgba(0,0,0,0.12));
+    }
+
+    #speaker-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #0059b3;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    /* ── Waiting hint ── */
+    #waiting-msg {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.62);
+      color: rgba(255, 255, 255, 0.92);
+      padding: 10px 22px;
+      border-radius: 22px;
+      font-size: 13.5px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      z-index: 200;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    /* ── UI Buttons ── */
+    #ui-buttons {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 200;
+    }
+
+    .ar-btn {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px 15px;
+      border-radius: 26px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
+    }
+
+    .ar-btn:active,
+    .ar-btn.active {
+      transform: scale(0.94);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(135deg, #0059b3 0%, #003d7a 100%);
+    }
+
+    /* ── Loading overlay ── */
+    #loader {
+      position: fixed;
+      inset: 0;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 999;
+      color: white;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #loader .spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #loader p { color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px; }
+
+    /* ── Animations ── */
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: translateX(-50%) scale(0.85) translateY(-8px); }
+      to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.65; }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading overlay (se oculta cuando la escena AR está lista) -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <span>Terminal de Tucumán</span>
+    <p>Cargando experiencia AR…</p>
+  </div>
+
+  <!-- Globo de texto del guía -->
+  <div id="speech-bubble" role="status" aria-live="polite">
+    <span id="speaker-label">🧑‍✈️ Gonza — Guía</span>
+    <span id="bubble-text">¡Hola! Bienvenido a la Terminal de Tucumán. Soy Gonza y seré tu guía. Los baños están a la derecha, entre las plataformas 5 y 10. ¿En qué puedo ayudarte?</span>
+  </div>
+
+  <!-- Mensaje de espera -->
+  <div id="waiting-msg">📷 Apuntá la cámara al marcador Hiro</div>
+
+  <!-- Botones táctiles -->
+  <div id="ui-buttons" role="navigation" aria-label="Opciones del guía">
+    <button class="ar-btn" onclick="handleBtn(this, 'comer')"    aria-label="Dónde comer">🍽️ Dónde comer</button>
+    <button class="ar-btn" onclick="handleBtn(this, 'hospedaje')" aria-label="Hospedaje">🏨 Hospedaje</button>
+    <button class="ar-btn" onclick="handleBtn(this, 'idioma')"   aria-label="Idioma">🌐 Idioma</button>
+  </div>
+
+  <!-- Escena AR -->
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true;"
+    vr-mode-ui="enabled: false"
+    loading-screen="enabled: false"
+  >
+    <a-assets timeout="15000">
+      <a-asset-item id="guia-model" src="guia.glb"></a-asset-item>
+    </a-assets>
+
+    <a-marker preset="hiro" id="hiro-marker" smooth="true" smoothCount="5" smoothTolerance="0.01">
+      <a-entity
+        id="guide-entity"
+        gltf-model="#guia-model"
+        scale="0.5 0.5 0.5"
+        position="0 0.5 0"
+        rotation="0 0 0"
+        animation-mixer="loop: repeat; timeScale: 1; clampWhenFinished: false;"
+        animation__float="property: position; from: 0 0.5 0; to: 0 0.7 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
+        animation__appear="property: scale; from: 0 0 0; to: 0.5 0.5 0.5; dur: 600; easing: easeOutBack; startEvents: markerFound;"
+      ></a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    const messages = {
+      default:   '¡Hola! Bienvenido a la Terminal de Tucumán. Soy Gonza y seré tu guía. Los baños están a la derecha, entre las plataformas 5 y 10. ¿En qué puedo ayudarte?',
+      comer:     'Te recomiendo Restaurante El Portal (plataforma 2) y Bar La Terminal. Ambos abren 24hs.',
+      hospedaje: 'Hoteles cercanos: Hotel Premier (a 5 cuadras) y Hostel Centro (económico). ¿Querés más info?',
+      idioma:    'I speak English too! Ich spreche auch Deutsch. ¿Qué idioma preferís?'
+    };
+
+    const bubble     = document.getElementById('speech-bubble');
+    const bubbleText = document.getElementById('bubble-text');
+    const waitingMsg = document.getElementById('waiting-msg');
+    const loader     = document.getElementById('loader');
+    const marker     = document.getElementById('hiro-marker');
+    const btns       = document.querySelectorAll('.ar-btn');
+
+    let markerVisible  = false;
+    let activeBtn      = null;
+
+    // Ocultar loader cuando la escena AR inicializa
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+      loader.style.transition = 'opacity 0.5s ease';
+      loader.style.opacity = '0';
+      setTimeout(() => { loader.style.display = 'none'; }, 500);
+    });
+
+    // Marcador detectado
+    marker.addEventListener('markerFound', () => {
+      markerVisible = true;
+      waitingMsg.style.display = 'none';
+      showBubble();
+    });
+
+    // Marcador perdido
+    marker.addEventListener('markerLost', () => {
+      markerVisible = false;
+      bubble.style.display = 'none';
+      waitingMsg.style.display = 'block';
+    });
+
+    function showBubble() {
+      bubble.style.display = 'none';
+      // Forzar reflow para reiniciar animación CSS
+      void bubble.offsetWidth;
+      bubble.style.display = 'block';
+    }
+
+    function handleBtn(btn, type) {
+      // Feedback visual en el botón
+      if (activeBtn) activeBtn.classList.remove('active');
+      activeBtn = btn;
+      btn.classList.add('active');
+      setTimeout(() => btn.classList.remove('active'), 300);
+
+      // Actualizar texto del globo
+      bubbleText.textContent = messages[type];
+
+      // Mostrar globo aunque el marcador no esté visible
+      showBubble();
+    }
+  </script>
+</body>
+</html>
