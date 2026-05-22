@@ -203,12 +203,12 @@
       <a-entity
         id="guide-entity"
         gltf-model="#guia-model"
-        scale="0.5 0.5 0.5"
-        position="0 0.5 0"
-        rotation="0 0 0"
+        scale="1.5 1.5 1.5"
+        position="0 1.5 0"
+        rotation="0 180 0"
         animation-mixer="loop: repeat; timeScale: 1; clampWhenFinished: false;"
-        animation__float="property: position; from: 0 0.5 0; to: 0 0.7 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
-        animation__appear="property: scale; from: 0 0 0; to: 0.5 0.5 0.5; dur: 600; easing: easeOutBack; startEvents: markerFound;"
+        animation__float="property: position; from: 0 1.5 0; to: 0 1.7 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
+        animation__appear="property: scale; from: 0 0 0; to: 1.5 1.5 1.5; dur: 600; easing: easeOutBack; startEvents: markerFound;"
       ></a-entity>
     </a-marker>
 
@@ -244,7 +244,9 @@
     marker.addEventListener('markerFound', () => {
       markerVisible = true;
       waitingMsg.style.display = 'none';
+      bubbleText.textContent = messages.default;
       showBubble();
+      speak(messages.default);
     });
 
     // Marcador perdido
@@ -252,6 +254,7 @@
       markerVisible = false;
       bubble.style.display = 'none';
       waitingMsg.style.display = 'block';
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     });
 
     function showBubble() {
@@ -262,17 +265,52 @@
     }
 
     function handleBtn(btn, type) {
-      // Feedback visual en el botón
       if (activeBtn) activeBtn.classList.remove('active');
       activeBtn = btn;
       btn.classList.add('active');
       setTimeout(() => btn.classList.remove('active'), 300);
-
-      // Actualizar texto del globo
       bubbleText.textContent = messages[type];
-
-      // Mostrar globo aunque el marcador no esté visible
       showBubble();
+      speak(messages[type]);
+    }
+
+    // ── Web Speech API (TTS) ──────────────────────────────────────────────
+    let speechUnlocked = false;
+    let pendingSpeech   = null;
+    let selectedVoice   = null;
+
+    // Unlock en primer toque — requisito iOS Safari
+    document.addEventListener('touchstart', function unlockSpeech() {
+      document.removeEventListener('touchstart', unlockSpeech);
+      const silent = new SpeechSynthesisUtterance(' ');
+      silent.volume = 0;
+      window.speechSynthesis.speak(silent);
+      speechUnlocked = true;
+      if (pendingSpeech) { speak(pendingSpeech); pendingSpeech = null; }
+    }, { once: true });
+
+    function loadVoices() {
+      const voices = window.speechSynthesis.getVoices();
+      selectedVoice = voices.find(v => v.lang === 'es-AR')
+                   || voices.find(v => v.lang === 'es-ES')
+                   || voices.find(v => v.lang.startsWith('es'));
+    }
+    if ('speechSynthesis' in window) {
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    function speak(text) {
+      if (!('speechSynthesis' in window)) return;
+      if (!speechUnlocked) { pendingSpeech = text; return; }
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang   = 'es-AR';
+      utt.rate   = 0.88;
+      utt.pitch  = 1.0;
+      utt.volume = 1.0;
+      if (selectedVoice) utt.voice = selectedVoice;
+      window.speechSynthesis.speak(utt);
     }
   </script>
 </body>
