@@ -8,7 +8,6 @@
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -180,6 +179,13 @@
   <!-- Mensaje de espera -->
   <div id="waiting-msg">📷 Apuntá la cámara al marcador Hiro</div>
 
+  <!-- Botón Activar Sonido — visible siempre, requerido por iOS/Android -->
+  <div id="sound-bar" style="position:fixed;top:0;left:0;width:100%;z-index:300;display:flex;justify-content:center;padding:10px;">
+    <button id="btn-sound" class="ar-btn" onclick="activarSonido()" aria-label="Activar sonido del video" style="background:linear-gradient(135deg,#e67e22,#d35400);font-size:14px;">
+      🔊 Activar Sonido
+    </button>
+  </div>
+
   <!-- Botones táctiles -->
   <div id="ui-buttons" role="navigation" aria-label="Opciones del guía">
     <button id="btn-comer"     class="ar-btn" onclick="handleBtn(this,'comer')"     aria-label="Dónde comer">🍽️ Dónde comer</button>
@@ -196,20 +202,18 @@
     loading-screen="enabled: false"
   >
     <a-assets timeout="15000">
-      <a-asset-item id="guia-model" src="guia.glb"></a-asset-item>
+      <video id="guia-video" src="guia.mp4" playsinline webkit-playsinline loop muted preload="auto" crossorigin="anonymous"></video>
     </a-assets>
 
     <a-marker preset="hiro" id="hiro-marker" smooth="true" smoothCount="5" smoothTolerance="0.01">
-      <a-entity
-        id="guide-entity"
-        gltf-model="#guia-model"
-        scale="1.5 1.5 1.5"
-        position="0 -0.5 0.5"
-        rotation="0 180 0"
-        animation-mixer="loop: repeat; timeScale: 1; clampWhenFinished: false;"
-        animation__float="property: position; from: 0 -0.5 0.5; to: 0 -0.3 0.5; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
-        animation__appear="property: scale; from: 0 0 0; to: 1.5 1.5 1.5; dur: 600; easing: easeOutBack; startEvents: markerFound;"
-      ></a-entity>
+      <a-video
+        id="guide-video"
+        src="#guia-video"
+        width="2"
+        height="3.5"
+        position="0 1.75 0"
+        rotation="0 0 0"
+      ></a-video>
     </a-marker>
 
     <a-entity camera></a-entity>
@@ -270,6 +274,7 @@
       bubbleText.textContent = messages[currentLang].default;
       showBubble();
       speak(messages[currentLang].default);
+      document.getElementById('guia-video').play();
     });
 
     // Marcador perdido
@@ -278,6 +283,7 @@
       bubble.style.display = 'none';
       waitingMsg.style.display = 'block';
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      document.getElementById('guia-video').pause();
     });
 
     function showBubble() {
@@ -326,6 +332,13 @@
     if ('speechSynthesis' in window) {
       loadVoiceForLang('es');
       window.speechSynthesis.onvoiceschanged = () => loadVoiceForLang(currentLang);
+    }
+
+    function activarSonido() {
+      const vid = document.getElementById('guia-video');
+      vid.muted = false;
+      vid.volume = 1.0;
+      document.getElementById('sound-bar').style.display = 'none';
     }
 
     function speak(text) {
